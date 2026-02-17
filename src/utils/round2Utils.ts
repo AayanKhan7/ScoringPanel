@@ -5,7 +5,7 @@ import { Team, Score } from '../types';
  */
 export function calculateRound1AverageScore(teamId: string, scores: Score[]): number {
   const teamScores = scores.filter(
-    s => s.teamId === teamId && s.isFinalized
+    s => s.teamId === teamId && s.isFinalized && s.round !== 'Round 2'
   );
 
   if (teamScores.length === 0) return 0;

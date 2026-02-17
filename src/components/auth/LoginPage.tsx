@@ -1,42 +1,68 @@
 import { useState } from 'react';
 import { Shield, Gavel, Mail, Lock, ArrowRight, Hash } from 'lucide-react';
 import { User } from '../../types';
+import { login } from '../../api/scoringApi';
 
 interface LoginPageProps {
   onLogin: (user: User) => void;
-  mockAdminUser: User;
-  mockJudgeUsers: User[];
 }
 
-export function LoginPage({ onLogin, mockAdminUser, mockJudgeUsers }: LoginPageProps) {
+export function LoginPage({ onLogin }: LoginPageProps) {
   const [selectedRole, setSelectedRole] = useState<'admin' | 'judge' | null>(null);
   const [adminId, setAdminId] = useState('');
   const [judgeId, setJudgeId] = useState('');
   const [error, setError] = useState('');
 
-  const handleQuickLogin = (user: User) => {
-    onLogin(user);
+  const buildUser = (payload: { id: string; name: string; role: 'admin' | 'judge'; judgeId: string; judgeType?: 'Internal' | 'External' }): User => {
+    if (payload.role === 'judge') {
+      const match = payload.judgeId.match(/\d+/);
+      const numericId = match ? Number(match[0]) : 0;
+      const inferredType = numericId >= 11 || payload.judgeId.toLowerCase().includes('ext') ? 'External' : 'Internal';
+      const type = payload.judgeType || inferredType;
+      return {
+        id: payload.judgeId,
+        name: payload.name,
+        email: '',
+        role: 'judge',
+        judgeProfile: {
+          id: payload.judgeId,
+          name: payload.name,
+          email: '',
+          expertise: ['All Domains'],
+          assignedEventIds: ['event-1'],
+          type
+        }
+      };
+    }
+
+    return {
+      id: payload.judgeId,
+      name: payload.name,
+      email: '',
+      role: 'admin'
+    };
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     
-    // Simple mock authentication
+    // Authenticate with backend
     if (selectedRole === 'admin') {
       const trimmedAdminId = adminId.trim();
-      if (trimmedAdminId === mockAdminUser.id) {
-        onLogin(mockAdminUser);
-      } else {
-        setError('Invalid Admin ID. Please try again.');
+      try {
+        const res = await login({ judgeId: trimmedAdminId });
+        onLogin(buildUser(res.user));
+      } catch (err: any) {
+        setError(err?.message || 'Invalid Admin ID. Please try again.');
       }
     } else if (selectedRole === 'judge') {
       const trimmedJudgeId = judgeId.trim();
-      const judge = mockJudgeUsers.find(j => j.id === trimmedJudgeId);
-      if (judge) {
-        onLogin(judge);
-      } else {
-        setError('Invalid Judge ID. Please try again.');
+      try {
+        const res = await login({ judgeId: trimmedJudgeId });
+        onLogin(buildUser(res.user));
+      } catch (err: any) {
+        setError(err?.message || 'Invalid Judge ID. Please try again.');
       }
     }
   };

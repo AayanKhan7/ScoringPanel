@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Users, Trophy, ChevronDown, ChevronUp, Search } from 'lucide-react';
 import { Event, Team, Judge, RoundType, Score } from '../../types';
-import { getRound2Teams } from '../../utils/round2Utils';
 
 interface AllocationViewProps {
   events: Event[];
@@ -20,12 +19,15 @@ export function AllocationView({ events, teams, judges, scores }: AllocationView
   
   // Get teams available for the selected round
   const availableRoundTeams = selectedRound === 'Round 2'
-    ? getRound2Teams(teams, scores, selectedEventId)
+    ? teams.filter(t => t.eventId === selectedEventId && (t.allocatedJudges?.round2?.length || 0) > 0)
     : teams.filter(t => t.eventId === selectedEventId);
   
+  const isInternalJudge = (judge: Judge) => judge.type?.toLowerCase() === 'internal';
+  const isExternalJudge = (judge: Judge) => judge.type?.toLowerCase() === 'external';
+
   // Filter judges by round type
-  const roundJudges = judges.filter(j => 
-    selectedRound === 'Round 1' ? j.type === 'Internal' : j.type === 'External'
+  const roundJudges = judges.filter(j =>
+    selectedRound === 'Round 1' ? isInternalJudge(j) : isExternalJudge(j)
   );
 
   // Filter by search query

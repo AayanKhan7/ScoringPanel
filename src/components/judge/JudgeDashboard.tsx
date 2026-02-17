@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
-import { Calendar, Users, Trophy, CheckCircle, Clock, FileText, Award, Target, ChevronRight, ExternalLink } from 'lucide-react';
+import { useMemo, useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router';
+import { Calendar, Users, Trophy, CheckCircle, Clock, Award, Target, ChevronRight, Download } from 'lucide-react';
 import { Event, Team, Score, User } from '../../types';
-import { getRound2Teams } from '../../utils/round2Utils';
+import { exportJsonToExcel } from '../../utils/exportUtils';
 
 interface JudgeDashboardProps {
   currentUser: User;
@@ -13,7 +13,9 @@ interface JudgeDashboardProps {
 
 export function JudgeDashboard({ currentUser, events, teams, scores }: JudgeDashboardProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const judgeProfile = currentUser.judgeProfile;
+  const [showSubmittedBanner, setShowSubmittedBanner] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState<string>('');
 
   // Filter events assigned to this judge
@@ -33,13 +35,13 @@ export function JudgeDashboard({ currentUser, events, teams, scores }: JudgeDash
 
   // Get teams available for judging based on round
   const availableTeams = activeEvent && judgeType === 'External'
-    ? getRound2Teams(teams, scores, activeEvent.id)
+    ? teams.filter(t => t.eventId === activeEvent.id && (t.allocatedJudges?.round2?.length || 0) > 0)
     : teams;
 
   // Get teams allocated to this judge for the active event
   // Round 2 (External): ALL top 15 teams (no allocation needed)
   const eventTeams = judgeType === 'External' && activeEvent
-    ? getRound2Teams(teams, scores, activeEvent.id)
+    ? availableTeams.filter(t => t.allocatedJudges?.round2?.includes(currentUser.id))
     : availableTeams.filter(t => {
         if (!activeEvent) return false;
         if (t.eventId !== activeEvent.id) return false;
@@ -51,14 +53,15 @@ export function JudgeDashboard({ currentUser, events, teams, scores }: JudgeDash
 
   // Calculate statistics
   const stats = useMemo(() => {
-    const myScores = scores.filter(s => s.judgeId === currentUser.id);
+    const myScores = scores.filter(
+      s => s.judgeId === currentUser.id && (s.round ? s.round === currentRound : currentRound === 'Round 1')
+    );
     
     // Count total teams allocated to this judge across all assigned events
     let totalTeamsToScore = 0;
     assignedEvents.forEach(event => {
       if (judgeType === 'External') {
-        // External judges score all top 15 teams
-        const round2Teams = getRound2Teams(teams, scores, event.id);
+        const round2Teams = teams.filter(t => t.eventId === event.id && t.allocatedJudges?.round2?.includes(currentUser.id));
         totalTeamsToScore += round2Teams.length;
       } else {
         // Internal judges score only allocated teams
@@ -91,10 +94,40 @@ export function JudgeDashboard({ currentUser, events, teams, scores }: JudgeDash
     }
   };
 
+  useEffect(() => {
+    const submittedFlag = (location && (location as any).state && (location as any).state.submitted) || window.history.state?.submitted;
+    if (submittedFlag) {
+      setShowSubmittedBanner(true);
+      const t = setTimeout(() => {
+        setShowSubmittedBanner(false);
+        // clear history state
+        try { window.history.replaceState({}, ''); } catch (e) {}
+        try { navigate('/judge', { replace: true }); } catch (e) {}
+      }, 2500);
+      return () => clearTimeout(t);
+    }
+  }, [location, navigate]);
+
+  const handleExportAllocatedTeams = () => {
+    if (!activeEvent) return;
+
+    const exportRows = eventTeams.map((team, index) => ({
+      'S.No': index + 1,
+      'Team ID': team.id,
+      'Team Name': team.teamName,
+      Domain: team.domain,
+      'Problem Statement': team.problemStatement || '',
+      'Round': currentRound,
+      'Event Name': activeEvent.name
+    }));
+
+    exportJsonToExcel(exportRows, `${activeEvent.name}_Allocated_Teams_${currentUser.id}`);
+  };
+
   // Get score status for a team
   const getTeamScoreStatus = (teamId: string) => {
     const score = scores.find(
-      s => s.teamId === teamId && s.judgeId === currentUser.id
+      s => s.teamId === teamId && s.judgeId === currentUser.id && (s.round ? s.round === currentRound : currentRound === 'Round 1')
     );
     if (!score) return { status: 'pending', label: 'Not Scored', color: 'slate' };
     if (score.isFinalized) return { status: 'completed', label: 'Completed', color: 'green' };
@@ -116,6 +149,12 @@ export function JudgeDashboard({ currentUser, events, teams, scores }: JudgeDash
           </div>
         )}
       </div>
+
+      {showSubmittedBanner && (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+          <p className="text-green-700 font-semibold">Score Submitted Successfully</p>
+        </div>
+      )}
 
       {/* Login Credentials Card */}
       <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6">
@@ -202,8 +241,7 @@ export function JudgeDashboard({ currentUser, events, teams, scores }: JudgeDash
               // Count teams allocated to this judge for this event
               let eventTeamsCount = 0;
               if (judgeType === 'External') {
-                // External judges score all top 15 teams
-                const round2Teams = getRound2Teams(teams, scores, event.id);
+                const round2Teams = teams.filter(t => t.eventId === event.id && t.allocatedJudges?.round2?.includes(currentUser.id));
                 eventTeamsCount = round2Teams.length;
               } else {
                 // Internal judges score only allocated teams
@@ -241,14 +279,24 @@ export function JudgeDashboard({ currentUser, events, teams, scores }: JudgeDash
       {activeEvent ? (
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
           <div className="p-6 border-b border-slate-200">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
               <div>
                 <h2 className="text-xl font-semibold text-slate-900">{activeEvent.name}</h2>
                 <p className="text-sm text-slate-600 mt-1">Click on a team to start scoring</p>
               </div>
-              <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-sm font-medium">
-                {eventTeams.length} Teams
-              </span>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleExportAllocatedTeams}
+                  disabled={eventTeams.length === 0}
+                  className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Download className="size-4" />
+                  Download Excel
+                </button>
+                <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-sm font-medium">
+                  {eventTeams.length} Teams
+                </span>
+              </div>
             </div>
           </div>
 

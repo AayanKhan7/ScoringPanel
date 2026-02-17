@@ -72,9 +72,11 @@ export interface Score {
   remarks?: string;
   submittedAt: string;
   isFinalized: boolean;
+  round?: RoundType;
 }
 
 export interface Judge {
+  backendId?: string;
   id: string;
   name: string;
   email: string;

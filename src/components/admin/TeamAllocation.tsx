@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Users, CheckCircle, XCircle, ArrowRight, UserPlus, Trophy } from 'lucide-react';
 import { Event, Team, Judge, RoundType, Score } from '../../types';
 import { getRound2Teams } from '../../utils/round2Utils';
+import { listDomainJudges } from '../../api/scoringApi';
 
 interface TeamAllocationProps {
   event: Event;
@@ -9,16 +10,50 @@ interface TeamAllocationProps {
   judges: Judge[];
   scores: Score[];
   onUpdateTeamAllocation: (teamId: string, judgeIds: string[], round: RoundType) => void;
+  onPersistDomainAllocation?: (domainName: string, judgeIds: string[]) => Promise<void>;
 }
 
-export function TeamAllocation({ event, teams, judges, scores, onUpdateTeamAllocation }: TeamAllocationProps) {
+export function TeamAllocation({ event, teams, judges, scores, onUpdateTeamAllocation, onPersistDomainAllocation }: TeamAllocationProps) {
   const [selectedRound, setSelectedRound] = useState<RoundType>('Round 1');
   const [selectedDomain, setSelectedDomain] = useState<string>(event.domains[0]);
   const [selectedJudgeIds, setSelectedJudgeIds] = useState<string[]>([]);
+  const [assignedJudgeIds, setAssignedJudgeIds] = useState<string[]>([]);
+  const [domainJudgeMap, setDomainJudgeMap] = useState<Record<string, string[]>>({});
+  const [editMode, setEditMode] = useState(false);
+
+  const domainNameToKey = useMemo(() => {
+    const map = new Map([
+      ['Fintech and E-commerce', 'fintech_ecommerce'],
+      ['Health and BioTech', 'health_biotech'],
+      ['Agri-Tech & Rural Empowerment', 'agritech_rural'],
+      ['Sustainable solutions and smart cities', 'sustainable_smart_cities'],
+      ['Skills and Edtech', 'skills_edtech']
+    ]);
+    return map;
+  }, []);
+
+  const domainKeyToName = useMemo(() => {
+    const map = new Map([
+      ['fintech_ecommerce', 'Fintech and E-commerce'],
+      ['health_biotech', 'Health and BioTech'],
+      ['agritech_rural', 'Agri-Tech & Rural Empowerment'],
+      ['sustainable_smart_cities', 'Sustainable solutions and smart cities'],
+      ['skills_edtech', 'Skills and Edtech']
+    ]);
+    return map;
+  }, []);
+
+  const getDomainKey = useCallback(
+    (domainName: string) => domainNameToKey.get(domainName) || domainName,
+    [domainNameToKey]
+  );
+
+  const isInternalJudge = (judge: Judge) => judge.type?.toLowerCase() === 'internal';
+  const isExternalJudge = (judge: Judge) => judge.type?.toLowerCase() === 'external';
 
   // Filter judges by round
-  const internalJudges = judges.filter(j => j.type === 'Internal');
-  const externalJudges = judges.filter(j => j.type === 'External');
+  const internalJudges = judges.filter(isInternalJudge);
+  const externalJudges = judges.filter(isExternalJudge);
   
   // For Round 1, show all internal judges
   // For Round 2, show all external judges
@@ -31,30 +66,61 @@ export function TeamAllocation({ event, teams, judges, scores, onUpdateTeamAlloc
     ? teams.filter(t => t.eventId === event.id && t.domain === selectedDomain)
     : getRound2Teams(teams, scores, event.id);
 
-  // Get judges that are already allocated to ANY teams in ANY domain for this round
-  const getAllocatedJudgeIds = (): string[] => {
-    const roundKey = selectedRound === 'Round 1' ? 'round1' : 'round2';
-    const allocatedIds = new Set<string>();
-    
-    // Check ALL teams in the event, not just current domain
-    const allEventTeams = teams.filter(t => t.eventId === event.id);
-    
-    allEventTeams.forEach(team => {
-      const judges = team.allocatedJudges?.[roundKey] || [];
-      judges.forEach(judgeId => allocatedIds.add(judgeId));
+  const assignedDomainByJudge = useMemo(() => {
+    const map = new Map<string, string>();
+    Object.entries(domainJudgeMap).forEach(([domainKey, judgeIds]) => {
+      judgeIds.forEach(judgeId => {
+        if (!map.has(judgeId)) {
+          map.set(judgeId, domainKey);
+        }
+      });
     });
-    
-    return Array.from(allocatedIds);
-  };
+    return map;
+  }, [domainJudgeMap]);
 
-  const allocatedJudgeIds = getAllocatedJudgeIds();
-  
-  // Available judges are those not yet allocated to any domain
-  const availableJudges = allAvailableJudges.filter(j => !allocatedJudgeIds.includes(j.id));
+  // Show only unassigned judges in selection list
+  const availableJudges = allAvailableJudges.filter(j => !assignedDomainByJudge.has(j.id));
+
+  useEffect(() => {
+    const loadDomainJudges = async () => {
+      if (selectedRound !== 'Round 1') {
+        setAssignedJudgeIds([]);
+        return;
+      }
+
+      try {
+        const results = await Promise.all(
+          event.domains.map(async (domainName) => {
+            const domainKey = getDomainKey(domainName);
+            const domainJudges = await listDomainJudges(domainKey);
+            const ids = domainJudges.map((assignment: any) => assignment.judge?.judgeId).filter(Boolean);
+            return { domainKey, ids };
+          })
+        );
+
+        const map: Record<string, string[]> = {};
+        results.forEach(({ domainKey, ids }) => {
+          map[domainKey] = ids;
+        });
+        setDomainJudgeMap(map);
+
+        const selectedKey = getDomainKey(selectedDomain);
+        const selectedIds = map[selectedKey] || [];
+        setAssignedJudgeIds(selectedIds);
+        setSelectedJudgeIds(selectedIds);
+        setEditMode(selectedIds.length === 0);
+      } catch {
+        setAssignedJudgeIds([]);
+      }
+    };
+
+    loadDomainJudges();
+  }, [selectedDomain, selectedRound, event.domains, getDomainKey]);
 
   // Reset judge selection when domain or round changes
   useEffect(() => {
     setSelectedJudgeIds([]);
+    setEditMode(true);
   }, [selectedDomain, selectedRound]);
 
   // Handle judge selection/deselection
@@ -69,8 +135,16 @@ export function TeamAllocation({ event, teams, judges, scores, onUpdateTeamAlloc
   };
 
   // Handle allocate button click
-  const handleAllocateTeams = () => {
+  const handleAllocateTeams = async () => {
     if (selectedJudgeIds.length === 0) return;
+
+    if (selectedRound === 'Round 1' && onPersistDomainAllocation) {
+      try {
+        await onPersistDomainAllocation(selectedDomain, selectedJudgeIds);
+      } catch (error: any) {
+        alert(error?.message || 'Failed to persist allocations');
+      }
+    }
 
     // Distribute teams equally using round-robin
     domainTeams.forEach((team, index) => {
@@ -83,6 +157,7 @@ export function TeamAllocation({ event, teams, judges, scores, onUpdateTeamAlloc
 
     // Clear selection after allocation
     setSelectedJudgeIds([]);
+    setEditMode(false);
   };
 
   // Check if judge is assigned to team
@@ -133,16 +208,6 @@ export function TeamAllocation({ event, teams, judges, scores, onUpdateTeamAlloc
               }`}
             >
               Round 1 <span className="text-xs ml-1">(Internal)</span>
-            </button>
-            <button
-              onClick={() => setSelectedRound('Round 2')}
-              className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all shadow-sm ${
-                selectedRound === 'Round 2'
-                  ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white'
-                  : 'bg-white border border-slate-300 text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              Round 2 <span className="text-xs ml-1">(External)</span>
             </button>
           </div>
         </div>
@@ -222,148 +287,212 @@ export function TeamAllocation({ event, teams, judges, scores, onUpdateTeamAlloc
         </div>
       </div>
 
-      {/* Available Judges List */}
+      {/* Assigned Judges (from backend) */}
       {selectedRound === 'Round 1' && (
         <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-          <h3 className="text-lg font-bold text-slate-900 mb-4">
-            Select Judges for Automatic Team Distribution
-          </h3>
-          <p className="text-sm text-slate-600 mb-4">
-            Select judges below and teams will be automatically distributed equally among them
-          </p>
-        <div className="grid md:grid-cols-2 gap-4">
-          {availableJudges.map(judge => {
-            const isSelected = selectedJudgeIds.includes(judge.id);
-            const teamCount = getJudgeTeamCount(judge.id);
-            
-            return (
-              <button
-                key={judge.id}
-                onClick={() => handleToggleJudgeSelection(judge.id)}
-                className={`p-4 rounded-lg border-2 transition-all text-left shadow-sm ${
-                  isSelected
-                    ? 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-400'
-                    : 'bg-slate-50 border-slate-300 hover:border-slate-400'
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  {/* Checkbox */}
-                  <div className={`w-6 h-6 rounded-md border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                    isSelected
-                      ? 'bg-blue-600 border-blue-500'
-                      : 'border-slate-400'
-                  }`}>
-                    {isSelected && (
-                      <CheckCircle className="size-4 text-white" />
-                    )}
-                  </div>
-                  
-                  {/* Judge Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
-                        <span className="text-white text-xs font-bold">
-                          {judge.name.split(' ').map(n => n[0]).join('')}
-                        </span>
+          <h3 className="text-lg font-bold text-slate-900 mb-3">Allocated Judges</h3>
+          {assignedJudgeIds.length === 0 ? (
+            <p className="text-sm text-slate-500">No judges assigned to this domain yet.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {assignedJudgeIds.map(judgeId => {
+                const judge = judges.find(j => j.id === judgeId);
+                return (
+                  <span
+                    key={judgeId}
+                    className="px-3 py-1.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-sm font-medium"
+                  >
+                    {judge?.name || judgeId}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Available Judges List / Edit Allocation */}
+      {selectedRound === 'Round 1' && (
+        <>
+          {assignedJudgeIds.length > 0 && !editMode ? (
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+              <h3 className="text-lg font-bold text-slate-900 mb-2">Edit judges allocation</h3>
+              <p className="text-sm text-slate-600 mb-4">
+                Judges are already allocated for this domain. Click edit to modify the allocation.
+              </p>
+              <div className="flex items-center gap-3 flex-wrap mb-4">
+                {assignedJudgeIds.map(jid => {
+                  const j = judges.find(x => x.id === jid);
+                  return (
+                    <span key={jid} className="px-3 py-1.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-sm font-medium">
+                      {j?.name || jid}
+                    </span>
+                  );
+                })}
+              </div>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-slate-600">{domainTeams.length} teams will be distributed equally</p>
+                <button
+                  onClick={() => setEditMode(true)}
+                  className="px-4 py-2 bg-white border border-slate-300 rounded-md hover:bg-slate-50 text-sm"
+                >
+                  Edit Allocation
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+              <h3 className="text-lg font-bold text-slate-900 mb-4">
+                Select Judges for Automatic Team Distribution
+              </h3>
+              <p className="text-sm text-slate-600 mb-4">
+                Select judges below and teams will be automatically distributed equally among them
+              </p>
+              <div className="grid md:grid-cols-2 gap-4">
+                {availableJudges.map(judge => {
+                  const isSelected = selectedJudgeIds.includes(judge.id);
+                  const teamCount = getJudgeTeamCount(judge.id);
+                  const assignedDomainKey = assignedDomainByJudge.get(judge.id);
+                  const selectedDomainKey = getDomainKey(selectedDomain);
+                  const isLockedToOtherDomain = selectedRound === 'Round 1' &&
+                    assignedDomainKey &&
+                    assignedDomainKey !== selectedDomainKey;
+                  const assignedDomainName = assignedDomainKey
+                    ? (domainKeyToName.get(assignedDomainKey) || assignedDomainKey)
+                    : null;
+
+                  return (
+                    <button
+                      key={judge.id}
+                      onClick={() => {
+                        if (!isLockedToOtherDomain) handleToggleJudgeSelection(judge.id);
+                      }}
+                      className={`p-4 rounded-lg border-2 transition-all text-left shadow-sm ${
+                        isLockedToOtherDomain
+                          ? 'bg-slate-100 border-slate-200 cursor-not-allowed opacity-70'
+                          : isSelected
+                          ? 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-400'
+                          : 'bg-slate-50 border-slate-300 hover:border-slate-400'
+                      }`}
+                      disabled={isLockedToOtherDomain}
+                    >
+                      <div className="flex items-start gap-3">
+                        {/* Checkbox */}
+                        <div className={`w-6 h-6 rounded-md border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                          isSelected
+                            ? 'bg-blue-600 border-blue-500'
+                            : 'border-slate-400'
+                        }`}>
+                          {isSelected && (
+                            <CheckCircle className="size-4 text-white" />
+                          )}
+                        </div>
+                        
+                        {/* Judge Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
+                              <span className="text-white text-xs font-bold">
+                                {judge.name.split(' ').map(n => n[0]).join('')}
+                              </span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-slate-900 truncate">{judge.name}</p>
+                            </div>
+                          </div>
+                          <p className="text-xs text-slate-600 mb-2 truncate">{judge.expertise.join(', ')}</p>
+                          {assignedDomainName && (
+                            <p className={`text-xs ${isLockedToOtherDomain ? 'text-amber-700' : 'text-slate-500'} truncate`}>
+                              Assigned: {assignedDomainName}
+                            </p>
+                          )}
+                          
+                          {/* Team Count */}
+                          {isSelected && (
+                            <div className="flex items-center gap-1.5 text-xs">
+                              <Users className="size-3 text-blue-600" />
+                              <span className="text-blue-600 font-medium">
+                                {teamCount} {teamCount === 1 ? 'team' : 'teams'} assigned
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-900 truncate">{judge.name}</p>
-                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Allocate Button */}
+              {selectedJudgeIds.length > 0 && (
+                <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-slate-900 font-medium">
+                        {selectedJudgeIds.length} {selectedJudgeIds.length === 1 ? 'Judge' : 'Judges'} Selected
+                      </p>
+                      <p className="text-sm text-slate-600 mt-1">
+                        {domainTeams.length} teams will be distributed equally ({Math.floor(domainTeams.length / selectedJudgeIds.length)}-{Math.ceil(domainTeams.length / selectedJudgeIds.length)} teams per judge)
+                      </p>
                     </div>
-                    <p className="text-xs text-slate-600 mb-2 truncate">{judge.expertise.join(', ')}</p>
-                    
-                    {/* Team Count */}
-                    {isSelected && (
-                      <div className="flex items-center gap-1.5 text-xs">
-                        <Users className="size-3 text-blue-600" />
-                        <span className="text-blue-600 font-medium">
-                          {teamCount} {teamCount === 1 ? 'team' : 'teams'} assigned
-                        </span>
-                      </div>
-                    )}
+                    <button
+                      onClick={handleAllocateTeams}
+                      className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg font-medium transition-all flex items-center gap-2 shadow-md"
+                    >
+                      <UserPlus className="size-4" />
+                      Allocate Teams
+                    </button>
                   </div>
                 </div>
-              </button>
-            );
-          })}
-        </div>
-        
-        {/* Allocate Button */}
-        {selectedJudgeIds.length > 0 && (
-          <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-slate-900 font-medium">
-                  {selectedJudgeIds.length} {selectedJudgeIds.length === 1 ? 'Judge' : 'Judges'} Selected
-                </p>
-                <p className="text-sm text-slate-600 mt-1">
-                  {domainTeams.length} teams will be distributed equally ({Math.floor(domainTeams.length / selectedJudgeIds.length)}-{Math.ceil(domainTeams.length / selectedJudgeIds.length)} teams per judge)
-                </p>
-              </div>
-              <button
-                onClick={handleAllocateTeams}
-                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg font-medium transition-all flex items-center gap-2 shadow-md"
-              >
-                <UserPlus className="size-4" />
-                Allocate Teams
-              </button>
+              )}
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </>
       )}
 
       {/* Teams List with Judge Assignment */}
-      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-        <h3 className="text-lg font-bold text-slate-900 mb-4">
-          {selectedRound === 'Round 1' 
-            ? `Teams in ${selectedDomain} (${domainTeams.length})`
-            : `Round 2 Top 15 Teams (${domainTeams.length} teams)`
-          }
-        </h3>
-        <p className="text-sm text-slate-600 mb-4">
-          {selectedRound === 'Round 1'
-            ? 'Teams are automatically distributed equally among selected judges'
-            : 'All external judges will evaluate all 15 teams. No allocation needed.'
-          }
-        </p>
+      {selectedRound === 'Round 1' ? (
+        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+          <h3 className="text-lg font-bold text-slate-900 mb-4">
+            {`Teams in ${selectedDomain} (${domainTeams.length})`}
+          </h3>
+          <p className="text-sm text-slate-600 mb-4">
+            Teams are automatically distributed equally among selected judges
+          </p>
 
-        <div className="space-y-3">
-          {domainTeams.map(team => {
-            const assignedCount = getAssignedCount(team.id);
-            const assignedJudges = availableJudges.filter(j => isJudgeAssigned(team.id, j.id));
-            
-            return (
-              <div
-                key={team.id}
-                className="bg-slate-50 border border-slate-200 rounded-lg p-4"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <h4 className="text-slate-900 font-medium">{team.teamName}</h4>
-                    <p className="text-xs text-slate-600 mt-1">
-                      {team.members.length} member{team.members.length !== 1 ? 's' : ''} • {team.domain}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {/* Round 1: Show Assigned Judges */}
-                    {selectedRound === 'Round 1' && assignedJudges.length > 0 && (
-                      <div className="flex items-center gap-2">
-                        {assignedJudges.map(judge => (
-                          <div
-                            key={judge.id}
-                            className="px-3 py-1.5 bg-blue-100 border border-blue-300 rounded-lg"
-                          >
-                            <p className="text-xs font-medium text-blue-700">
-                              {judge.name.split(' ')[0]}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    
-                    {/* Status Badge */}
-                    {selectedRound === 'Round 1' ? (
+          <div className="space-y-3">
+            {domainTeams.map(team => {
+              const assignedCount = getAssignedCount(team.id);
+              const assignedJudges = availableJudges.filter(j => isJudgeAssigned(team.id, j.id));
+              
+              return (
+                <div
+                  key={team.id}
+                  className="bg-slate-50 border border-slate-200 rounded-lg p-4"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <h4 className="text-slate-900 font-medium">{team.teamName}</h4>
+                      <p className="text-xs text-slate-600 mt-1">
+                        {team.members.length} member{team.members.length !== 1 ? 's' : ''} • {team.domain}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {assignedJudges.length > 0 && (
+                        <div className="flex items-center gap-2">
+                          {assignedJudges.map(judge => (
+                            <div
+                              key={judge.id}
+                              className="px-3 py-1.5 bg-blue-100 border border-blue-300 rounded-lg"
+                            >
+                              <p className="text-xs font-medium text-blue-700">
+                                {judge.name.split(' ')[0]}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
                       <span className={`px-3 py-1 rounded-md text-xs font-medium flex-shrink-0 ${
                         assignedCount > 0
                           ? 'bg-green-100 text-green-700 border border-green-200'
@@ -381,28 +510,34 @@ export function TeamAllocation({ event, teams, judges, scores, onUpdateTeamAlloc
                           </span>
                         )}
                       </span>
-                    ) : (
-                      <span className="px-3 py-1 rounded-md text-xs font-medium flex-shrink-0 bg-amber-100 text-amber-700 border border-amber-200">
-                        <span className="flex items-center gap-1">
-                          <Trophy className="size-3" />
-                          Top 15 Qualified
-                        </span>
-                      </span>
-                    )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
 
-          {domainTeams.length === 0 && (
-            <div className="text-center py-8 text-slate-400">
-              <Users className="size-12 mx-auto mb-3 opacity-50" />
-              <p>No teams found in this domain</p>
-            </div>
-          )}
+            {domainTeams.length === 0 && (
+              <div className="text-center py-8 text-slate-400">
+                <Users className="size-12 mx-auto mb-3 opacity-50" />
+                <p>No teams found in this domain</p>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+          <div className="flex items-start gap-3">
+            <Trophy className="size-5 text-amber-600 mt-0.5" />
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">Round 2 allocations are automatic</h3>
+              <p className="text-sm text-slate-600 mt-1">
+                When Round 2 is set up, all 15 qualified teams are automatically assigned to all external judges.
+                View the assignments in the Judge Allocation View.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -366,8 +366,11 @@ export function exportRound2ResultsToExcel(
   event: Event,
   judges: any[]
 ): void {
+  const round1Scores = scores.filter(s => s.round !== 'Round 2');
+  const round2Scores = scores.filter(s => s.round === 'Round 2');
+
   // Get top 15 teams (top 3 from each domain based on Round 1)
-  const top15Teams = getTop3TeamsPerDomain(teams, scores, event.id);
+  const top15Teams = getTop3TeamsPerDomain(teams, round1Scores, event.id);
 
   if (top15Teams.length === 0) {
     alert('No Round 2 teams available. Please ensure Round 1 has been completed and scored.');
@@ -376,6 +379,7 @@ export function exportRound2ResultsToExcel(
 
   // Get external judges for Round 2 scoring
   const externalJudges = judges.filter(j => j.type === 'External');
+  const judgesForRound2 = externalJudges.length ? externalJudges : judges;
 
   // Calculate Round 2 scores for each team
   const round2Results = top15Teams.map(topTeam => {
@@ -383,10 +387,10 @@ export function exportRound2ResultsToExcel(
     if (!team) return null;
 
     // Get Round 2 scores for this team from external judges
-    const teamRound2Scores = scores.filter(s => 
+    const teamRound2Scores = round2Scores.filter(s => 
       s.teamId === team.id && 
       s.isFinalized &&
-      externalJudges.some(j => j.id === s.judgeId)
+      judgesForRound2.some(j => j.id === s.judgeId)
     );
 
     // Calculate average Round 2 score

@@ -152,3 +152,21 @@ export const exportTeamsToExcel = (eventName: string, teams: any[]) => {
   const fileName = `${eventName.replace(/\s+/g, '_')}_Teams_${new Date().toISOString().split('T')[0]}.xlsx`;
   XLSX.writeFile(workbook, fileName);
 };
+
+export const exportJsonToExcel = (
+  data: Record<string, unknown>[],
+  fileName: string
+) => {
+  if (!Array.isArray(data) || data.length === 0) {
+    alert('No data available to export.');
+    return;
+  }
+
+  const worksheet = XLSX.utils.json_to_sheet(data);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Data');
+
+  const safeName = fileName.replace(/\s+/g, '_');
+  const finalName = safeName.toLowerCase().endsWith('.xlsx') ? safeName : `${safeName}.xlsx`;
+  XLSX.writeFile(workbook, finalName);
+};

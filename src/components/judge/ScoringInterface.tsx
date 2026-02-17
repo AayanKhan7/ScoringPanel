@@ -1,15 +1,14 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router'
+import { useParams, Link, useNavigate } from 'react-router'
 import { ArrowLeft, Send, Users, CheckCircle } from 'lucide-react'
 import { Event, Team, Score, User } from '../../types'
-import { getRound2Teams } from '../../utils/round2Utils'
 
 interface ScoringInterfaceProps {
   currentUser: User
   events: Event[]
   teams: Team[]
   scores: Score[]
-  onSubmitScore: (score: Omit<Score, 'id' | 'submittedAt'>) => void
+  onSubmitScore: (score: Omit<Score, 'id' | 'submittedAt'>) => Promise<void> | void
 }
 
 /* =========================================================
@@ -49,31 +48,34 @@ export function ScoringInterface({
   scores,
   onSubmitScore,
 }: ScoringInterfaceProps) {
-  const { eventId } = useParams<{ eventId: string }>()
+  const { eventId, teamId } = useParams<{ eventId: string; teamId?: string }>()
   const event = events.find(e => e.id === eventId)
 
   const judgeType = currentUser.judgeProfile?.type
+  const currentRound: 'Round 1' | 'Round 2' = judgeType === 'Internal' ? 'Round 1' : 'Round 2'
   const roundKey = judgeType === 'Internal' ? 'round1' : 'round2'
 
   // Get teams for this round
   // Round 1 (Internal): Only allocated teams
-  // Round 2 (External): ALL top 15 teams (no allocation needed)
+  // Round 2 (External): use backend allocations
   const availableTeams = judgeType === 'External' && eventId
-    ? getRound2Teams(teams, scores, eventId)
+    ? teams.filter(t => t.eventId === eventId && (t.allocatedJudges?.round2?.length || 0) > 0)
     : teams.filter(t => t.eventId === eventId);
 
-  const eventTeams = judgeType === 'External'
-    ? availableTeams  // External judges see ALL Round 2 teams
-    : availableTeams.filter(t => t.allocatedJudges?.[roundKey]?.includes(currentUser.id))
+  const judgeIdentifier = (currentUser as any).judgeId || currentUser.id
 
-  const selectedTeam = eventTeams[0]
+  const eventTeams = judgeType === 'External'
+    ? availableTeams.filter(t => t.allocatedJudges?.round2?.includes(judgeIdentifier))
+    : availableTeams.filter(t => t.allocatedJudges?.[roundKey]?.includes(judgeIdentifier))
+
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(eventTeams[0]?.id || null)
+  const selectedTeam = eventTeams.find(t => t.id === selectedTeamId) || null
 
   const [criterionScores, setCriterionScores] = useState<Record<string, number>>({})
   const [activeRanges, setActiveRanges] = useState<
     Record<string, { min: number; max: number }>
   >({})
   const [bonusScore, setBonusScore] = useState(0)
-  const [remarks, setRemarks] = useState('')
   const [submitted, setSubmitted] = useState(false)
 
   useEffect(() => {
@@ -81,16 +83,36 @@ export function ScoringInterface({
       s =>
         s.eventId === eventId &&
         s.teamId === selectedTeam?.id &&
-        s.judgeId === currentUser.id
+        s.judgeId === (currentUser as any).judgeId &&
+        (s.round ? s.round === currentRound : currentRound === 'Round 1')
     )
 
     if (existingScore) {
       setCriterionScores(existingScore.scores)
       setBonusScore(existingScore.bonusScore || 0)
-      setRemarks(existingScore.remarks || '')
-      if (existingScore.isFinalized) setSubmitted(true)
+      setSubmitted(Boolean(existingScore.isFinalized))
+    } else {
+      setCriterionScores({})
+      setBonusScore(0)
+      setSubmitted(false)
     }
-  }, [eventId, selectedTeam?.id, scores, currentUser.id])
+  }, [eventId, selectedTeam?.id, scores, (currentUser as any).judgeId, currentRound])
+
+  useEffect(() => {
+    if (eventTeams.length && !selectedTeamId) {
+      setSelectedTeamId(eventTeams[0].id)
+    }
+    if (selectedTeamId && !eventTeams.find(t => t.id === selectedTeamId)) {
+      setSelectedTeamId(eventTeams[0]?.id || null)
+    }
+  }, [eventTeams, selectedTeamId])
+
+  useEffect(() => {
+    // If URL contains a teamId param, use it to select the team
+    if (teamId) {
+      setSelectedTeamId(teamId)
+    }
+  }, [teamId])
 
   if (!event || !selectedTeam) {
     return (
@@ -104,29 +126,45 @@ export function ScoringInterface({
   const baseScore = Object.values(criterionScores).reduce((a, b) => a + b, 0)
   const totalScore = Number((baseScore + bonusScore).toFixed(1))
 
-  const submit = () => {
-    const allScored = event.scoringCriteria.every(
-      c => criterionScores[c.id] !== undefined
-    )
+  const submit = async () => {
+    const allScored = event.scoringCriteria.every(c => {
+      const value = criterionScores[c.id]
+      return typeof value === 'number' && !Number.isNaN(value)
+    })
 
     if (!allScored) {
       alert('Please score all main criteria')
       return
     }
 
-    onSubmitScore({
-      eventId: event.id,
-      teamId: selectedTeam.id,
-      judgeId: currentUser.id,
-      judgeName: currentUser.name,
-      scores: criterionScores,
-      bonusScore,
-      totalScore,
-      remarks,
-      isFinalized: true,
-    })
+    try {
+      await onSubmitScore({
+        eventId: event.id,
+        teamId: selectedTeam.id,
+        judgeId: currentUser.id,
+        judgeName: currentUser.name,
+        scores: criterionScores,
+        bonusScore: Number.isFinite(bonusScore) ? bonusScore : 0,
+        totalScore,
+        isFinalized: true,
+        round: currentRound
+      })
 
-    setSubmitted(true)
+      setSubmitted(true)
+      // navigate back to dashboard and pass a state flag so the dashboard shows a success banner
+      try {
+        // use a microtask to ensure state updates before navigation
+        setTimeout(() => {
+          // use History API navigation via Link alternative
+          window.history.pushState({ submitted: true }, '')
+          window.location.href = '/judge'
+        }, 50)
+      } catch (e) {
+        // fallback: do nothing
+      }
+    } catch {
+      // handled by submit handler
+    }
   }
 
   /* =========================================================
@@ -272,19 +310,16 @@ export function ScoringInterface({
           step={0.1}
           min={0}
           max={5}
-          value={bonusScore}
-          onChange={e => setBonusScore(Number(e.target.value))}
+          value={Number.isFinite(bonusScore) ? bonusScore : 0}
+          onChange={e => {
+            const raw = e.target.value;
+            if (raw === '') {
+              setBonusScore(0);
+              return;
+            }
+            setBonusScore(Number(raw));
+          }}
           className="w-24 text-center border rounded-lg"
-        />
-      </div>
-
-      <div className="bg-white p-6 rounded-xl border">
-        <textarea
-          value={remarks}
-          onChange={e => setRemarks(e.target.value)}
-          rows={4}
-          placeholder="Remarks (optional)"
-          className="w-full border rounded-lg p-3"
         />
       </div>
 
