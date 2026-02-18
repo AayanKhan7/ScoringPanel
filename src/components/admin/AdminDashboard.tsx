@@ -770,10 +770,10 @@ export function AdminDashboard({ events, teams, scores, judges, onJudgeCreated, 
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white border border-slate-200 rounded-lg p-6 shadow-sm flex flex-col justify-between h-32">
+        <div className="bg-white border border-slate-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between h-32">
           <div className="flex items-center justify-between mb-2">
-            <div className="w-10 h-10 bg-indigo-100 rounded-md flex items-center justify-center">
-              <Users className="size-5 text-indigo-600" />
+            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+              <Users className="size-5 text-blue-600" />
             </div>
           </div>
           <div>
@@ -782,10 +782,10 @@ export function AdminDashboard({ events, teams, scores, judges, onJudgeCreated, 
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-lg p-6 shadow-sm flex flex-col justify-between h-32">
+        <div className="bg-white border border-slate-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between h-32">
           <div className="flex items-center justify-between mb-2">
-            <div className="w-10 h-10 bg-cyan-100 rounded-md flex items-center justify-center">
-              <Gavel className="size-5 text-cyan-600" />
+            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+              <Gavel className="size-5 text-blue-600" />
             </div>
           </div>
           <div>
@@ -794,10 +794,10 @@ export function AdminDashboard({ events, teams, scores, judges, onJudgeCreated, 
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-lg p-6 shadow-sm flex flex-col justify-between h-32">
+        <div className="bg-white border border-slate-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between h-32">
           <div className="flex items-center justify-between mb-2">
-            <div className="w-10 h-10 bg-emerald-100 rounded-md flex items-center justify-center">
-              <CheckCircle className="size-5 text-emerald-600" />
+            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+              <CheckCircle className="size-5 text-blue-600" />
             </div>
           </div>
           <div>
@@ -806,10 +806,10 @@ export function AdminDashboard({ events, teams, scores, judges, onJudgeCreated, 
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-lg p-6 shadow-sm flex flex-col justify-between h-32">
+        <div className="bg-white border border-slate-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between h-32">
           <div className="flex items-center justify-between mb-2">
-            <div className="w-10 h-10 bg-amber-100 rounded-md flex items-center justify-center">
-              <Trophy className="size-5 text-amber-600" />
+            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+              <Trophy className="size-5 text-blue-600" />
             </div>
           </div>
           <div>
@@ -821,11 +821,11 @@ export function AdminDashboard({ events, teams, scores, judges, onJudgeCreated, 
 
       {/* Add / Update Judges */}
       <Collapsible open={isJudgeFormOpen} onOpenChange={setIsJudgeFormOpen}>
-        <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-6 shadow-sm">
+        <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
           <CollapsibleTrigger asChild>
             <button
               type="button"
-              className="w-full flex items-center justify-between gap-3 text-left"
+              className="w-full flex items-center justify-between gap-3 text-left hover:text-blue-600 transition-colors"
             >
               <h2 className="text-base sm:text-lg font-semibold text-slate-900">Add / Update Judges</h2>
               <ChevronDown
@@ -905,8 +905,8 @@ export function AdminDashboard({ events, teams, scores, judges, onJudgeCreated, 
       </Collapsible>
 
       {/* Calculate Results */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-6 shadow-sm">
-        <h2 className="text-base sm:text-lg font-semibold text-slate-900 mb-4">Calculate Results</h2>
+      <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
+        <h2 className="text-base sm:text-lg font-semibold text-blue-900 mb-4">Calculate Results</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <button
             onClick={async () => {
@@ -929,10 +929,10 @@ export function AdminDashboard({ events, teams, scores, judges, onJudgeCreated, 
               }
             }}
             disabled={!canCalculateRound1 || loadingRound1 || round1Calculated || round1HasResults}
-            className={`w-full flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-3 sm:p-4 border rounded-xl shadow-sm transition-all ${round1Calculated || round1HasResults ? 'bg-emerald-100 border-emerald-400 cursor-not-allowed' : canCalculateRound1 ? 'bg-white hover:bg-slate-50 border-slate-300' : 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed'}`}
+            className={`w-full flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-3 sm:p-4 border rounded-xl shadow-sm transition-all ${round1Calculated || round1HasResults ? 'bg-blue-100 border-blue-400 cursor-not-allowed' : canCalculateRound1 ? 'bg-white hover:bg-blue-50 border-slate-300 hover:border-blue-300' : 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed'}`}
           >
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${round1Calculated || round1HasResults ? 'bg-emerald-100' : 'bg-slate-100'}`}>
-              {loadingRound1 ? <Loader2 className="size-5 text-emerald-600 animate-spin" /> : <Clock className={`size-5 ${round1Calculated || round1HasResults ? 'text-emerald-600' : 'text-slate-600'}`} />}
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${round1Calculated || round1HasResults ? 'bg-blue-100' : 'bg-slate-100'}`}>
+              {loadingRound1 ? <Loader2 className="size-5 text-blue-600 animate-spin" /> : <Clock className={`size-5 ${round1Calculated || round1HasResults ? 'text-blue-600' : 'text-slate-600'}`} />}
             </div>
             <div className="min-w-0">
               <p className="font-medium text-sm sm:text-base text-slate-900">Calculate Round 1 Results</p>
@@ -962,10 +962,10 @@ export function AdminDashboard({ events, teams, scores, judges, onJudgeCreated, 
               }
             }}
             disabled={!canSetupRound2 || loadingSetupRound2 || hasRound2Setup}
-            className={`w-full flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-3 sm:p-4 border rounded-xl shadow-sm transition-all ${hasRound2Setup ? 'bg-emerald-100 border-emerald-400 cursor-not-allowed' : round1HasResults ? 'bg-white hover:bg-slate-50 border-slate-300' : 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed'}`}
+            className={`w-full flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-3 sm:p-4 border rounded-xl shadow-sm transition-all ${hasRound2Setup ? 'bg-blue-100 border-blue-400 cursor-not-allowed' : round1HasResults ? 'bg-white hover:bg-blue-50 border-slate-300 hover:border-blue-300' : 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed'}`}
           >
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${hasRound2Setup ? 'bg-emerald-100' : round1HasResults ? 'bg-slate-100' : 'bg-slate-100'}`}>
-              {loadingSetupRound2 ? <Loader2 className="size-5 text-blue-600 animate-spin" /> : <Users className={`size-5 ${hasRound2Setup ? 'text-emerald-600' : 'text-slate-600'}`} />}
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${hasRound2Setup ? 'bg-blue-100' : round1HasResults ? 'bg-slate-100' : 'bg-slate-100'}`}>
+              {loadingSetupRound2 ? <Loader2 className="size-5 text-blue-600 animate-spin" /> : <Users className={`size-5 ${hasRound2Setup ? 'text-blue-600' : 'text-slate-600'}`} />}
             </div>
             <div className="min-w-0">
               <p className="font-medium text-sm sm:text-base text-slate-900">Setup Round 2</p>
@@ -1000,10 +1000,10 @@ export function AdminDashboard({ events, teams, scores, judges, onJudgeCreated, 
               }
             }}
               disabled={!canCalculateRound2 || loadingRound2 || round2Calculated}
-              className={`w-full flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-3 sm:p-4 border rounded-xl shadow-sm transition-all ${round2Calculated ? 'bg-emerald-100 border-emerald-400 cursor-not-allowed' : !hasRound2Setup ? 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white hover:bg-slate-50 border-slate-300'}`}
+              className={`w-full flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-3 sm:p-4 border rounded-xl shadow-sm transition-all ${round2Calculated ? 'bg-blue-100 border-blue-400 cursor-not-allowed' : !hasRound2Setup ? 'bg-slate-50 border-slate-200 text-slate-400 cursor-not-allowed' : 'bg-white hover:bg-blue-50 border-slate-300 hover:border-blue-300'}`}
           >
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${round2Calculated ? 'bg-emerald-100' : !hasRound2Setup ? 'bg-slate-100' : 'bg-slate-100'}`}>
-                {loadingRound2 ? <Loader2 className="size-5 text-amber-600 animate-spin" /> : <Award className={`size-5 ${round2Calculated ? 'text-emerald-600' : 'text-slate-600'}`} />}
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${round2Calculated ? 'bg-blue-100' : !hasRound2Setup ? 'bg-slate-100' : 'bg-slate-100'}`}>
+                {loadingRound2 ? <Loader2 className="size-5 text-blue-600 animate-spin" /> : <Award className={`size-5 ${round2Calculated ? 'text-blue-600' : 'text-slate-600'}`} />}
             </div>
             <div className="min-w-0">
               <p className="font-medium text-sm sm:text-base text-slate-900">Calculate Round 2 Results</p>
@@ -1014,15 +1014,15 @@ export function AdminDashboard({ events, teams, scores, judges, onJudgeCreated, 
       </div>
 
       {/* Quick Actions */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-6 shadow-sm">
-        <h2 className="text-base sm:text-lg font-semibold text-slate-900 mb-4">Quick Actions</h2>
+      <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
+        <h2 className="text-base sm:text-lg font-semibold text-blue-900 mb-4">Quick Actions</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <Link
             to="/admin/team-allocation"
-            className="flex items-center gap-3 p-3 sm:p-4 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors group"
+            className="flex items-center gap-3 p-3 sm:p-4 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-all group shadow-sm hover:shadow-md"
           >
-            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-200 transition-colors flex-shrink-0">
-              <CheckCircle className="size-5 text-green-600" />
+            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors flex-shrink-0">
+              <CheckCircle className="size-5 text-blue-600" />
             </div>
             <div className="min-w-0">
               <p className="font-medium text-sm sm:text-base text-slate-900">Team Allocation</p>
@@ -1032,7 +1032,7 @@ export function AdminDashboard({ events, teams, scores, judges, onJudgeCreated, 
           
           <Link
             to="/admin/allocation-view"
-            className="flex items-center gap-3 p-3 sm:p-4 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors group"
+            className="flex items-center gap-3 p-3 sm:p-4 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-all group shadow-sm hover:shadow-md"
           >
             <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors flex-shrink-0">
               <Users className="size-5 text-blue-600" />
@@ -1045,10 +1045,10 @@ export function AdminDashboard({ events, teams, scores, judges, onJudgeCreated, 
 
           <Link
             to="/admin/live-updates"
-            className="flex items-center gap-3 p-3 sm:p-4 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors group"
+            className="flex items-center gap-3 p-3 sm:p-4 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-all group shadow-sm hover:shadow-md"
           >
-            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center group-hover:bg-purple-200 transition-colors flex-shrink-0">
-              <TrendingUp className="size-5 text-purple-600" />
+            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors flex-shrink-0">
+              <TrendingUp className="size-5 text-blue-600" />
             </div>
             <div className="min-w-0">
               <p className="font-medium text-sm sm:text-base text-slate-900">Live Updates</p>
@@ -1064,15 +1064,15 @@ export function AdminDashboard({ events, teams, scores, judges, onJudgeCreated, 
 
       {/* Domain-wise Results removed per request */}
       {/* Exports */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-6 shadow-sm">
-        <h2 className="text-base sm:text-lg font-semibold text-slate-900 mb-4">All Rounds Export</h2>
+      <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
+        <h2 className="text-base sm:text-lg font-semibold text-blue-900 mb-4">All Rounds Export</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <button
             onClick={handleExportAllRound1Scores}
-            className="flex items-center gap-3 p-3 sm:p-4 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors group"
+            className="flex items-center gap-3 p-3 sm:p-4 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-all group shadow-sm hover:shadow-md"
           >
-            <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center group-hover:bg-emerald-200 transition-colors flex-shrink-0">
-              <Download className="size-5 text-emerald-600" />
+            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors flex-shrink-0">
+              <Download className="size-5 text-blue-600" />
             </div>
             <div className="min-w-0">
               <p className="font-medium text-sm sm:text-base text-slate-900 truncate">Export Round 1</p>
@@ -1082,10 +1082,10 @@ export function AdminDashboard({ events, teams, scores, judges, onJudgeCreated, 
 
           <button
             onClick={handleExportRound2Results}
-            className="flex items-center gap-3 p-3 sm:p-4 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors group"
+            className="flex items-center gap-3 p-3 sm:p-4 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-all group shadow-sm hover:shadow-md"
           >
-            <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center group-hover:bg-amber-200 transition-colors flex-shrink-0">
-              <Download className="size-5 text-amber-600" />
+            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors flex-shrink-0">
+              <Download className="size-5 text-blue-600" />
             </div>
             <div className="min-w-0">
               <p className="font-medium text-sm sm:text-base text-slate-900 truncate">Export Round 2</p>
