@@ -1,9 +1,20 @@
-# Netlify configuration for proxying API requests to backend
+# Netlify configuration for proxying API requests to Render backend
 [build]
+  command = "npm run build"
   publish = "build"
 
+[build.environment]
+  NODE_VERSION = "18"
+
+# Proxy API requests to Render backend (optional - direct calls work too)
 [[redirects]]
   from = "/api/*"
-  to = "http://34.47.198.176/api/:splat"
+  to = "https://scoringpanel-backend-1.onrender.com/api/:splat"
   status = 200
   force = true
+
+# SPA routing - redirect all other routes to index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

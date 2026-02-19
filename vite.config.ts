@@ -58,9 +58,9 @@
       open: true,
       proxy: {
         '/api': {
-          target: 'http://34.47.198.176',
+          target: 'https://scoringpanel-backend-1.onrender.com',
           changeOrigin: true,
-          secure: false,
+          secure: true,
         },
       },
     },

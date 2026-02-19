@@ -1,6 +1,7 @@
-// Always use relative API paths for Netlify proxy to backend
-// DO NOT use any base URL or hardcoded http://... here!
-const API_BASE_URL = '';
+// API base URL - uses Render hosted backend
+// In development, the proxy in vite.config.ts will forward /api requests
+// In production, use the full Render URL
+const API_BASE_URL = import.meta.env.PROD ? 'https://scoringpanel-backend-1.onrender.com' : '';
 
 const getToken = () => localStorage.getItem('auth_token');
 
