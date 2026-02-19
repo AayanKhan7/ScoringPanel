@@ -1,4 +1,6 @@
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:4000';
+// Always use relative API paths for Netlify proxy to backend
+// DO NOT use any base URL or hardcoded http://... here!
+const API_BASE_URL = '';
 
 const getToken = () => localStorage.getItem('auth_token');
 
